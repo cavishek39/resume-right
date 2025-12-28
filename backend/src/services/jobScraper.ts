@@ -114,68 +114,71 @@ export async function scrapeJobDescription(url: string): Promise<string> {
     const siteSelectors = getSiteSelectors(url)
 
     // Extract text from the page
-    const result = await page.evaluate((selectors) => {
-      // @ts-ignore - Running in browser context where document exists
-      const scripts = document.querySelectorAll(
-        'script, style, nav, header, footer, [role="navigation"], [role="banner"]'
-      )
-      // @ts-ignore
-      scripts.forEach((el) => el.remove())
+    const result = await page.evaluate(
+      (
+        selectors
+      ): { text: string; selectorUsed: string; source: string } | null => {
+        const doc: any = (globalThis as { document?: any }).document
+        if (!doc) return null
 
-      // Try site-specific selectors first
-      for (const selector of selectors) {
-        // @ts-ignore - Running in browser context where document exists
-        const element = document.querySelector(selector)
-        if (
-          element &&
-          element.textContent &&
-          element.textContent.trim().length > 100
-        ) {
-          return {
-            text: element.textContent,
-            selectorUsed: selector,
-            source: 'selector',
+        const scripts = doc.querySelectorAll(
+          'script, style, nav, header, footer, [role="navigation"], [role="banner"]'
+        )
+        scripts.forEach((el: { remove: () => void }) => el.remove())
+
+        // Try site-specific selectors first
+        for (const selector of selectors) {
+          const element = doc.querySelector(selector)
+          if (
+            element &&
+            element.textContent &&
+            element.textContent.trim().length > 100
+          ) {
+            return {
+              text: element.textContent,
+              selectorUsed: selector,
+              source: 'selector',
+            }
           }
         }
-      }
 
-      // Fallback: try to find the largest text block
-      // @ts-ignore
-      const allDivs = Array.from(document.querySelectorAll('div, section'))
-      let maxLength = 0
-      let bestContent = ''
+        // Fallback: try to find the largest text block
+        const allDivs = Array.from(
+          (doc.querySelectorAll && doc.querySelectorAll('div, section')) || []
+        ) as Array<{ textContent?: string | null }>
+        let maxLength = 0
+        let bestContent = ''
 
-      // @ts-ignore
-      allDivs.forEach((div) => {
-        // @ts-ignore
-        const text = div.textContent?.trim() || ''
-        // Look for divs with substantial text that might be job descriptions
-        if (
-          text.length > maxLength &&
-          text.length > 200 &&
-          text.length < 50000
-        ) {
-          maxLength = text.length
-          bestContent = text
+        allDivs.forEach((div) => {
+          const text = div.textContent?.trim() || ''
+          // Look for divs with substantial text that might be job descriptions
+          if (
+            text.length > maxLength &&
+            text.length > 200 &&
+            text.length < 50000
+          ) {
+            maxLength = text.length
+            bestContent = text
+          }
+        })
+
+        if (bestContent) {
+          return {
+            text: bestContent,
+            selectorUsed: 'largest-div',
+            source: 'largest-div',
+          }
         }
-      })
 
-      if (bestContent) {
+        // Last resort: get body text
         return {
-          text: bestContent,
-          selectorUsed: 'largest-div',
-          source: 'largest-div',
+          text: doc.body?.textContent || '',
+          selectorUsed: 'body',
+          source: 'body',
         }
-      }
-
-      // Last resort: get body text
-      // @ts-ignore - Running in browser context where document exists
-      return {
-        text: document.body.textContent,
-        selectorUsed: 'body',
-        source: 'body',
-      }
-    }, siteSelectors)
+      },
+      siteSelectors
+    )
 
     const content = result?.text || ''
 

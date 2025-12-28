@@ -1,0 +1,37 @@
+{
+  "name": "resume-right",
+  "version": "1.0.0",
+  "description": "Resume optimization API - parse resumes, analyze job descriptions, and generate tailored resumes",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "resume",
+    "job",
+    "fastify",
+    "api"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@fastify/cors": "^11.2.0",
+    "@fastify/multipart": "^9.3.0",
+    "better-sqlite3": "^12.5.0",
+    "dotenv": "^17.2.3",
+    "fastify": "^5.6.2",
+    "mammoth": "^1.11.0",
+    "pdfreader": "^3.0.8",
+    "puppeteer": "^24.34.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^25.0.3",
+    "nodemon": "^3.1.11",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  }
+}

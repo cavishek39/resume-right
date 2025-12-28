@@ -1,0 +1,41 @@
+{
+  "name": "resume-right-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Resume Right - Resume optimization platform with backend API and web UI",
+  "workspaces": [
+    "backend",
+    "ui"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:ui\"",
+    "dev:backend": "npm run dev --workspace=backend",
+    "dev:ui": "npm run dev --workspace=ui",
+    "build": "npm run build --workspaces",
+    "build:backend": "npm run build --workspace=backend",
+    "build:ui": "npm run build --workspace=ui",
+    "start": "concurrently \"npm run start:backend\" \"npm run start:ui\"",
+    "start:backend": "npm run start --workspace=backend",
+    "start:ui": "npm run start --workspace=ui",
+    "lint": "npm run lint --workspace=ui",
+    "install:all": "npm install && npm install --workspaces",
+    "clean": "rm -rf backend/dist backend/node_modules ui/.next ui/node_modules node_modules"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
+  "keywords": [
+    "resume",
+    "job",
+    "optimization",
+    "api",
+    "nextjs",
+    "monorepo"
+  ],
+  "author": "",
+  "license": "ISC"
+}

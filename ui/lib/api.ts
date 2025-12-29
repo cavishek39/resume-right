@@ -1,23 +1,16 @@
 import axios from 'axios'
 
-const API_URL = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:3001'
+// Prefer NEXT_PUBLIC_API_URL; fall back to legacy NEXT_PUBLIC_API_BASE and then localhost
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL ||
+  process.env.NEXT_PUBLIC_API_BASE ||
+  'http://localhost:3001'
 
 const api = axios.create({
   baseURL: API_URL,
   headers: {
     'Content-Type': 'application/json',
   },
-})
-
-api.interceptors.request.use((config) => {
-  if (typeof window !== 'undefined') {
-    const token = localStorage.getItem('authToken')
-    if (token) {
-      config.headers = config.headers || {}
-      config.headers.Authorization = `Bearer ${token}`
-    }
-  }
-  return config
 })
 
 export interface ResumeUploadResponse {
@@ -53,46 +46,103 @@ export interface AnalysisResponse {
   rewrittenResume: string | null
 }
 
-export interface AuthResponse {
+export interface AnalysisDetailResponse {
+  id: number
+  resumeId: number
+  jobId: number
+  comparison: AnalysisResponse['comparison']
+  suggestions: string[]
+  rewrittenResume: string | null
+  createdAt: string
+}
+
+export interface RecentAnalysisItem {
+  analysisId: number
+  jobId: number
+  resumeId: number
+  matchPercentage: number | null
+  missingSkills: string[]
+  missingRequirements: string[]
+  jobTitle: string | null
+  company: string | null
+  sourceUrl: string | null
+  createdAt: string
+}
+
+export interface RecentAnalysesResponse {
   success: boolean
-  userId: number
+  items: RecentAnalysisItem[]
+}
+
+export async function uploadResume(
+  file: File,
   token: string
-}
-
-export async function oneClickAuth(
-  displayName?: string
-): Promise<AuthResponse> {
-  const response = await api.post('/api/auth/oneclick', { displayName })
-  return response.data
-}
-
-export async function uploadResume(file: File): Promise<ResumeUploadResponse> {
+): Promise<ResumeUploadResponse> {
   const formData = new FormData()
   formData.append('file', file)
 
   const response = await api.post('/api/resume/upload', formData, {
     headers: {
       'Content-Type': 'multipart/form-data',
+      Authorization: `Bearer ${token}`,
     },
   })
 
   return response.data
 }
 
-export async function submitJob(data: {
-  jobUrl?: string
-  jobText?: string
-}): Promise<JobSubmitResponse> {
-  const response = await api.post('/api/job/submit', data)
+export async function submitJob(
+  data: {
+    jobUrl?: string
+    jobText?: string
+    companyName?: string
+  },
+  token: string
+): Promise<JobSubmitResponse> {
+  const response = await api.post('/api/job/submit', data, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
   return response.data
 }
 
-export async function fullAnalysis(data: {
-  resumeId: number
-  jobId: number
-  rewrite?: boolean
-}): Promise<AnalysisResponse> {
-  const response = await api.post('/api/analyze/full', data)
+export async function fullAnalysis(
+  data: {
+    resumeId: number
+    jobId: number
+    rewrite?: boolean
+  },
+  token: string
+): Promise<AnalysisResponse> {
+  const response = await api.post('/api/analyze/full', data, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+  return response.data
+}
+
+export async function fetchRecentAnalyses(
+  token: string
+): Promise<RecentAnalysesResponse> {
+  const response = await api.get('/api/analyze/recent', {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+  return response.data
+}
+
+export async function fetchAnalysisById(
+  analysisId: number,
+  token: string
+): Promise<AnalysisDetailResponse> {
+  const response = await api.get(`/api/analyze/${analysisId}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
   return response.data
 }
 

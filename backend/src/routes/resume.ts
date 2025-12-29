@@ -3,35 +3,49 @@ import path from 'path'
 import fs from 'fs/promises'
 import { parseResume } from '../services/resumeParser'
 import db from '../db/init'
-import { getUserByToken } from '../services/authService'
+import { getUserByToken, verifyClerkToken } from '../services/authService'
 
-const authenticate = (
+const authenticate = async (
   request: FastifyRequest,
   reply: FastifyReply
-): { id: number } | null => {
+): Promise<{ id: number } | null> => {
   const authHeader = request.headers.authorization
 
+  console.log('🔍 Auth attempt - Header present:', !!authHeader)
+
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    console.log('❌ No Bearer token in Authorization header')
     reply.code(401).send({ error: 'Authorization token required' })
     return null
   }
 
   const token = authHeader.replace('Bearer ', '')
-  const user = getUserByToken(token)
+  console.log('🎫 Token received (first 20 chars):', token.substring(0, 20) + '...')
 
-  if (!user) {
-    reply.code(401).send({ error: 'Invalid or expired token' })
-    return null
+  console.log('Trying Clerk authentication...')
+  const clerkUser = await verifyClerkToken(token)
+  if (clerkUser) {
+    console.log('✅ Clerk auth successful, userId:', clerkUser.userId)
+    return { id: clerkUser.userId }
   }
 
-  return { id: user.id }
+  console.log('Trying legacy token authentication...')
+  const user = getUserByToken(token)
+  if (user) {
+    console.log('✅ Legacy auth successful, userId:', user.id)
+    return { id: user.id }
+  }
+
+  console.log('❌ Both auth methods failed')
+  reply.code(401).send({ error: 'Invalid or expired token' })
+  return null
 }
 
 async function resumeRoutes(fastify: FastifyInstance): Promise<void> {
   // Upload and parse resume
   fastify.post('/upload', async (request, reply) => {
     try {
-      const user = authenticate(request, reply)
+      const user = await authenticate(request, reply)
       if (!user) return
 
       const data = await request.file()
@@ -102,7 +116,7 @@ async function resumeRoutes(fastify: FastifyInstance): Promise<void> {
   // Get parsed resume by ID
   fastify.get<{ Params: { id: string } }>('/:id', async (request, reply) => {
     try {
-      const user = authenticate(request, reply)
+      const user = await authenticate(request, reply)
       if (!user) return
 
       const { id } = request.params

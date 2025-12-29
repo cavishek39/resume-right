@@ -2,17 +2,48 @@ import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { scrapeJobDescription } from '../services/jobScraper'
 import { extractSkillsAndRequirements } from '../services/skillExtractor'
 import db from '../db/init'
-import { getUserByToken } from '../services/authService'
+import { getUserByToken, verifyClerkToken } from '../services/authService'
+import url from 'url'
 
 interface JobSubmitBody {
   jobUrl?: string
   jobText?: string
+  companyName?: string
 }
 
-const authenticate = (
+const deriveJobMeta = (
+  rawText: string,
+  sourceUrl: string | null
+): { job_title: string | null; company: string | null } => {
+  let job_title: string | null = null
+  let company: string | null = null
+
+  if (sourceUrl) {
+    try {
+      const parsed = url.parse(sourceUrl)
+      if (parsed.hostname) {
+        const hostParts = parsed.hostname.split('.')
+        if (hostParts.length >= 2) {
+          company = hostParts[hostParts.length - 2]
+        }
+      }
+    } catch (err) {
+      // ignore parse errors
+    }
+  }
+
+  const firstLine = rawText.split('\n').find((line) => line.trim().length > 5)
+  if (firstLine) {
+    job_title = firstLine.trim().slice(0, 120)
+  }
+
+  return { job_title, company }
+}
+
+const authenticate = async (
   request: FastifyRequest,
   reply: FastifyReply
-): { id: number } | null => {
+): Promise<{ id: number } | null> => {
   const authHeader = request.headers.authorization
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -21,29 +52,36 @@ const authenticate = (
   }
 
   const token = authHeader.replace('Bearer ', '')
+
+  const clerkUser = await verifyClerkToken(token)
+  if (clerkUser) return { id: clerkUser.userId }
+
   const user = getUserByToken(token)
+  if (user) return { id: user.id }
 
-  if (!user) {
-    reply.code(401).send({ error: 'Invalid or expired token' })
-    return null
-  }
-
-  return { id: user.id }
+  reply.code(401).send({ error: 'Invalid or expired token' })
+  return null
 }
 
 async function jobRoutes(fastify: FastifyInstance): Promise<void> {
   // Submit job description (text or URL)
   fastify.post<{ Body: JobSubmitBody }>('/submit', async (request, reply) => {
     try {
-      const user = authenticate(request, reply)
+      const user = await authenticate(request, reply)
       if (!user) return
 
-      const { jobUrl, jobText } = request.body
+      const { jobUrl, jobText, companyName } = request.body
 
       if (!jobUrl && !jobText) {
         return reply
           .code(400)
           .send({ error: 'Either jobUrl or jobText is required' })
+      }
+
+      if (jobText && !companyName) {
+        return reply
+          .code(400)
+          .send({ error: 'Company name is required when pasting job text' })
       }
 
       let rawText: string
@@ -74,14 +112,21 @@ async function jobRoutes(fastify: FastifyInstance): Promise<void> {
       )
 
       // Store in database
+      const meta = deriveJobMeta(rawText, sourceUrl)
+      if (jobText && companyName) {
+        meta.company = companyName
+      }
+
       const stmt = db.prepare(`
-        INSERT INTO job_descriptions (user_id, source_url, raw_text, extracted_skills, requirements)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO job_descriptions (user_id, source_url, job_title, company, raw_text, extracted_skills, requirements)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
       `)
 
       const result = stmt.run(
         user.id,
         sourceUrl,
+        meta.job_title,
+        meta.company,
         rawText,
         JSON.stringify(extracted.skills),
         JSON.stringify(extracted.requirements)
@@ -101,7 +146,7 @@ async function jobRoutes(fastify: FastifyInstance): Promise<void> {
   // Get job description by ID
   fastify.get<{ Params: { id: string } }>('/:id', async (request, reply) => {
     try {
-      const user = authenticate(request, reply)
+      const user = await authenticate(request, reply)
       if (!user) return
 
       const { id } = request.params
@@ -120,6 +165,8 @@ async function jobRoutes(fastify: FastifyInstance): Promise<void> {
       return {
         id: job.id,
         sourceUrl: job.source_url,
+        jobTitle: job.job_title,
+        company: job.company,
         rawText: job.raw_text,
         skills: JSON.parse(job.extracted_skills),
         requirements: JSON.parse(job.requirements),

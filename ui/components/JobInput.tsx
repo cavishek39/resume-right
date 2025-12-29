@@ -1,23 +1,28 @@
 'use client'
 
 import { useState } from 'react'
-import { Link, FileText } from 'lucide-react'
+import { Link, FileText, Building2 } from 'lucide-react'
 
 interface JobInputProps {
-  onSubmit: (data: { jobUrl?: string; jobText?: string }) => void
+  onSubmit: (data: {
+    jobUrl?: string
+    jobText?: string
+    companyName?: string
+  }) => void
 }
 
 export default function JobInput({ onSubmit }: JobInputProps) {
   const [inputType, setInputType] = useState<'url' | 'text'>('url')
   const [jobUrl, setJobUrl] = useState('')
   const [jobText, setJobText] = useState('')
+  const [companyName, setCompanyName] = useState('')
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (inputType === 'url' && jobUrl) {
       onSubmit({ jobUrl })
-    } else if (inputType === 'text' && jobText) {
-      onSubmit({ jobText })
+    } else if (inputType === 'text' && jobText && companyName.trim()) {
+      onSubmit({ jobText, companyName: companyName.trim() })
     }
   }
 
@@ -63,14 +68,34 @@ export default function JobInput({ onSubmit }: JobInputProps) {
             required
           />
         ) : (
-          <textarea
-            value={jobText}
-            onChange={(e) => setJobText(e.target.value)}
-            placeholder='Paste the full job description here...'
-            rows={8}
-            className='w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100'
-            required
-          />
+          <div className='space-y-3'>
+            <div>
+              <label className='flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                <Building2 className='w-4 h-4' /> Company Name (required)
+              </label>
+              <input
+                type='text'
+                value={companyName}
+                onChange={(e) => setCompanyName(e.target.value)}
+                placeholder='e.g., Acme Corp'
+                className='w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100'
+                required
+              />
+            </div>
+            <div>
+              <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                Job Description (paste text)
+              </label>
+              <textarea
+                value={jobText}
+                onChange={(e) => setJobText(e.target.value)}
+                placeholder='Paste the full job description here...'
+                rows={8}
+                className='w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100'
+                required
+              />
+            </div>
+          </div>
         )}
 
         <button

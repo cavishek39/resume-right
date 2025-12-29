@@ -1,7 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { FileCheck, Sparkles, AlertCircle } from 'lucide-react'
+import { useEffect, useMemo, useState, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
+import { useAuth, useClerk, useUser } from '@clerk/nextjs'
+import { FileCheck, Sparkles, AlertCircle, LogOut } from 'lucide-react'
 import FileUpload from '@/components/FileUpload'
 import JobInput from '@/components/JobInput'
 import ResultsDisplay from '@/components/ResultsDisplay'
@@ -11,71 +13,135 @@ import {
   submitJob,
   fullAnalysis,
   AnalysisResponse,
-  oneClickAuth,
+  fetchRecentAnalyses,
+  RecentAnalysisItem,
+  fetchAnalysisById,
 } from '@/lib/api'
 
 export default function Home() {
-  const [step, setStep] = useState<
-    'auth' | 'upload' | 'job' | 'analyzing' | 'results'
-  >('auth')
+  const router = useRouter()
+  const { isLoaded, isSignedIn, getToken } = useAuth()
+  const { signOut } = useClerk()
+  const { user } = useUser()
+
+  const [step, setStep] = useState<'upload' | 'job' | 'analyzing' | 'results'>(
+    'upload'
+  )
   const [resumeFile, setResumeFile] = useState<File | null>(null)
   const [resumeId, setResumeId] = useState<number | null>(null)
   const [jobId, setJobId] = useState<number | null>(null)
-  const [userId, setUserId] = useState<number | null>(null)
   const [lastJobData, setLastJobData] = useState<{
     jobUrl?: string
     jobText?: string
+    companyName?: string
   } | null>(null)
   const [analysis, setAnalysis] = useState<AnalysisResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loadingMessage, setLoadingMessage] = useState('')
+  const [authToken, setAuthToken] = useState<string | null>(null)
+  const [recentOpen, setRecentOpen] = useState(false)
+  const [recentLoading, setRecentLoading] = useState(false)
+  const [recentError, setRecentError] = useState<string | null>(null)
+  const [recentItems, setRecentItems] = useState<RecentAnalysisItem[]>([])
+  const [historyOpeningId, setHistoryOpeningId] = useState<number | null>(null)
 
-  const progressSteps: Array<'auth' | 'upload' | 'job'> = [
-    'auth',
-    'upload',
-    'job',
-  ]
+  const progressSteps: Array<'upload' | 'job'> = ['upload', 'job']
 
-  useEffect(() => {
-    if (typeof window === 'undefined') return
+  const loadToken = useCallback(async () => {
+    // Request a fresh token to avoid stale/expired cache
+    const token = await getToken({ skipCache: true })
+    // console.log('🎫 Token from Clerk:', token?.substring(0, 30) + '...')
+    setAuthToken(token || null)
+    return token
+  }, [getToken])
 
-    const token = localStorage.getItem('authToken')
-    const storedUserId = localStorage.getItem('userId')
-
-    if (token && storedUserId) {
-      setUserId(Number(storedUserId))
-      setStep('upload')
+  const refreshRecent = useCallback(async (token: string) => {
+    try {
+      setRecentLoading(true)
+      setRecentError(null)
+      const resp = await fetchRecentAnalyses(token)
+      setRecentItems(resp.items)
+    } catch (err: any) {
+      setRecentError(
+        err?.response?.data?.error || err?.message || 'Failed to load history.'
+      )
+    } finally {
+      setRecentLoading(false)
     }
   }, [])
 
-  const handleOneClickAuth = async () => {
-    setError(null)
-    setLoadingMessage('Creating your session...')
-    setStep('analyzing')
-
-    try {
-      const response = await oneClickAuth()
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('authToken', response.token)
-        localStorage.setItem('userId', response.userId.toString())
-      }
-      setUserId(response.userId)
-      setStep('upload')
-    } catch (err: any) {
-      setError(
-        err.response?.data?.error ||
-          'Failed to create session. Please try again.'
-      )
-      setStep('auth')
-    } finally {
-      setLoadingMessage('')
+  useEffect(() => {
+    if (!isLoaded) return
+    if (!isSignedIn) {
+      router.push('/auth')
+      return
     }
-  }
+    void (async () => {
+      const token = await loadToken()
+      if (token) {
+        void refreshRecent(token)
+      }
+    })()
+  }, [isLoaded, isSignedIn, loadToken, refreshRecent, router])
+
+  const requireAuthToken = useCallback(async () => {
+    const token = authToken || (await loadToken())
+    if (!token) {
+      throw new Error('Missing auth token. Please sign in again.')
+    }
+    return token
+  }, [authToken, loadToken])
+
+  const formatJobLabel = useCallback((item: RecentAnalysisItem) => {
+    if (item.company) {
+      return item.jobTitle ? `${item.company} • ${item.jobTitle}` : item.company
+    }
+    if (item.jobTitle) return item.jobTitle
+    if (item.sourceUrl) {
+      try {
+        const host = new URL(item.sourceUrl).hostname.replace(/^www\./, '')
+        return host
+      } catch {
+        return 'Job'
+      }
+    }
+    return 'Job'
+  }, [])
+
+  const openAnalysisFromHistory = useCallback(
+    async (analysisId: number) => {
+      try {
+        setHistoryOpeningId(analysisId)
+        const token = await requireAuthToken()
+        const detail = await fetchAnalysisById(analysisId, token)
+
+        setAnalysis({
+          success: true,
+          analysisId: detail.id,
+          comparison: detail.comparison,
+          rewrittenResume: detail.rewrittenResume,
+        })
+        setResumeId(detail.resumeId)
+        setJobId(detail.jobId)
+        setError(null)
+        setStep('results')
+        setRecentOpen(false)
+      } catch (err: any) {
+        setError(
+          err?.response?.data?.error ||
+            err?.message ||
+            'Unable to open analysis from history.'
+        )
+      } finally {
+        setHistoryOpeningId(null)
+      }
+    },
+    [requireAuthToken]
+  )
 
   const handleResumeUpload = async (file: File) => {
-    if (!userId) {
-      setError('Please sign in before uploading a resume.')
-      setStep('auth')
+    if (!isSignedIn) {
+      router.push('/auth')
       return
     }
 
@@ -85,25 +151,31 @@ export default function Home() {
     setStep('analyzing')
 
     try {
-      const response = await uploadResume(file)
+      const token = await requireAuthToken()
+      const response = await uploadResume(file, token)
       setResumeId(response.resumeId)
       setStep('job')
+      void refreshRecent(token)
     } catch (err: any) {
       setError(
         err.response?.data?.error ||
+          err.message ||
           'Failed to upload resume. Please try again.'
       )
       setStep('upload')
+    } finally {
+      setLoadingMessage('')
     }
   }
 
   const handleJobSubmit = async (data: {
     jobUrl?: string
     jobText?: string
+    companyName?: string
   }) => {
-    if (!userId) {
-      setError('Please sign in before submitting a job description.')
-      setStep('auth')
+    if (!isSignedIn || !resumeId) {
+      setError('Please sign in and upload a resume first.')
+      router.push('/auth')
       return
     }
 
@@ -117,44 +189,47 @@ export default function Home() {
     setStep('analyzing')
 
     try {
-      const jobResponse = await submitJob(data)
+      const token = await requireAuthToken()
+      const jobResponse = await submitJob(data, token)
       setJobId(jobResponse.jobId)
 
-      if (resumeId) {
-        setLoadingMessage(
-          'Analyzing resume match and generating AI suggestions...'
-        )
-        const analysisResponse = await fullAnalysis({
+      setLoadingMessage(
+        'Analyzing resume match and generating AI suggestions...'
+      )
+      const analysisResponse = await fullAnalysis(
+        {
           resumeId,
           jobId: jobResponse.jobId,
           rewrite: true,
-        })
-        setAnalysis(analysisResponse)
-        setStep('results')
-      }
+        },
+        token
+      )
+      setAnalysis(analysisResponse)
+      setStep('results')
+      void refreshRecent(token)
     } catch (err: any) {
       setError(
         err.response?.data?.error ||
+          err.message ||
           'Failed to process job description. Please try again.'
       )
       setStep('job')
+    } finally {
+      setLoadingMessage('')
     }
   }
 
   const handleRetry = async () => {
     if (resumeId && lastJobData) {
-      // Retry job processing and analysis
       await handleJobSubmit(lastJobData)
       return
     }
 
     if (resumeFile) {
-      // Retry resume upload
       await handleResumeUpload(resumeFile)
       return
     }
 
-    // Nothing to retry, reset to first step
     handleReset()
   }
 
@@ -164,24 +239,26 @@ export default function Home() {
     setJobId(null)
     setAnalysis(null)
     setError(null)
-    setStep(userId ? 'upload' : 'auth')
+    setStep('upload')
   }
 
-  const currentProgressStep = () => {
+  const currentProgressStep = useMemo<'upload' | 'job'>(() => {
     if (step === 'results') return 'job'
     if (step === 'analyzing') {
-      if (!userId) return 'auth'
       if (resumeId) return 'job'
       return 'upload'
     }
     return step
-  }
+  }, [step, resumeId])
+
+  const displayName =
+    user?.fullName || user?.primaryEmailAddress?.emailAddress || 'Guest'
 
   return (
     <div className='min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800'>
       {/* Header */}
       <header className='bg-white dark:bg-gray-800 shadow-sm'>
-        <div className='max-w-6xl mx-auto px-4 py-6'>
+        <div className='max-w-6xl mx-auto px-4 py-6 flex items-center justify-between gap-4'>
           <div className='flex items-center gap-3'>
             <Sparkles className='w-8 h-8 text-blue-600' />
             <div>
@@ -193,6 +270,33 @@ export default function Home() {
               </p>
             </div>
           </div>
+
+          {isSignedIn && (
+            <div className='flex items-center gap-3 bg-gray-50 dark:bg-gray-700 px-3 py-2 rounded-lg'>
+              <div className='text-sm text-gray-700 dark:text-gray-200'>
+                <p className='font-semibold'>{displayName}</p>
+                <p className='text-xs text-gray-500 dark:text-gray-400'>
+                  Signed in
+                </p>
+              </div>
+              <button
+                onClick={() => setRecentOpen(true)}
+                className='inline-flex items-center gap-1 text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-300 dark:hover:text-blue-200'>
+                History
+              </button>
+              <button
+                onClick={() =>
+                  signOut(() => {
+                    setAuthToken(null)
+                    router.push('/auth')
+                  })
+                }
+                className='inline-flex items-center gap-1 text-sm font-medium text-red-600 hover:text-red-700 dark:text-red-300 dark:hover:text-red-200'>
+                <LogOut className='w-4 h-4' />
+                Sign out
+              </button>
+            </div>
+          )}
         </div>
       </header>
 
@@ -223,30 +327,6 @@ export default function Home() {
                 </button>
               </div>
             </div>
-          </div>
-        )}
-
-        {step === 'auth' && (
-          <div className='bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8'>
-            <div className='flex items-center gap-3 mb-6'>
-              <div className='bg-indigo-100 dark:bg-indigo-900/30 p-3 rounded-lg'>
-                <Sparkles className='w-6 h-6 text-indigo-600 dark:text-indigo-400' />
-              </div>
-              <div>
-                <h2 className='text-xl font-semibold text-gray-900 dark:text-gray-100'>
-                  One-click Sign In
-                </h2>
-                <p className='text-sm text-gray-600 dark:text-gray-400'>
-                  Create a private session to store your uploads securely
-                </p>
-              </div>
-            </div>
-            <button
-              type='button'
-              onClick={handleOneClickAuth}
-              className='w-full inline-flex items-center justify-center rounded-lg bg-indigo-600 text-white px-4 py-3 text-sm font-medium hover:bg-indigo-700 transition-colors'>
-              Start with one click
-            </button>
           </div>
         )}
 
@@ -327,7 +407,7 @@ export default function Home() {
         {step !== 'results' && (
           <div className='mt-8 flex items-center justify-center gap-3'>
             {progressSteps.map((progressStep, index) => {
-              const activeIndex = progressSteps.indexOf(currentProgressStep())
+              const activeIndex = progressSteps.indexOf(currentProgressStep)
               const isActive = activeIndex >= index
 
               return (
@@ -346,6 +426,117 @@ export default function Home() {
           </div>
         )}
       </main>
+
+      {/* History Drawer */}
+      {recentOpen && (
+        <div className='fixed inset-0 bg-black/40 backdrop-blur-sm z-40 flex justify-end'>
+          <div className='w-full max-w-md h-full bg-white dark:bg-gray-900 shadow-2xl p-6 overflow-y-auto'>
+            <div className='flex items-center justify-between mb-4'>
+              <div>
+                <h3 className='text-lg font-semibold text-gray-900 dark:text-gray-100'>
+                  Recent Analyses
+                </h3>
+                <p className='text-sm text-gray-600 dark:text-gray-400'>
+                  Last 20 jobs you analyzed
+                </p>
+              </div>
+              <button
+                onClick={() => setRecentOpen(false)}
+                className='text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'>
+                Close
+              </button>
+            </div>
+
+            {recentLoading && (
+              <div className='py-6 text-sm text-gray-600 dark:text-gray-400'>
+                Loading history...
+              </div>
+            )}
+
+            {recentError && (
+              <div className='mb-4 text-sm text-red-600 dark:text-red-400'>
+                {recentError}
+              </div>
+            )}
+
+            {!recentLoading && recentItems.length === 0 && (
+              <div className='text-sm text-gray-600 dark:text-gray-400'>
+                No analyses yet. Run one to see it here.
+              </div>
+            )}
+
+            <div className='space-y-3'>
+              {recentItems.map((item) => (
+                <div
+                  key={item.analysisId}
+                  className='border border-gray-200 dark:border-gray-700 rounded-lg p-3 bg-gray-50 dark:bg-gray-800'>
+                  <div className='flex items-start justify-between'>
+                    <div className='text-sm font-semibold text-gray-900 dark:text-gray-100'>
+                      {item.company || formatJobLabel(item)}
+                      {item.jobTitle && (
+                        <div className='text-xs text-gray-600 dark:text-gray-400 font-normal'>
+                          {item.jobTitle}
+                        </div>
+                      )}
+                    </div>
+                    {item.matchPercentage !== null && (
+                      <span className='text-sm font-medium text-blue-600 dark:text-blue-300'>
+                        {Math.round(item.matchPercentage)}%
+                      </span>
+                    )}
+                  </div>
+                  <div className='text-xs text-gray-500 dark:text-gray-400 mt-1 flex justify-between items-center gap-2'>
+                    <span>{new Date(item.createdAt).toLocaleString()}</span>
+                    {item.sourceUrl && !item.company && (
+                      <span className='truncate max-w-[140px] text-blue-600 dark:text-blue-300'>
+                        {(() => {
+                          try {
+                            return new URL(item.sourceUrl).hostname.replace(
+                              /^www\./,
+                              ''
+                            )
+                          } catch {
+                            return item.sourceUrl
+                          }
+                        })()}
+                      </span>
+                    )}
+                  </div>
+                  {(item.missingSkills.length > 0 ||
+                    item.missingRequirements.length > 0) && (
+                    <div className='mt-2 flex flex-wrap gap-2'>
+                      {item.missingSkills.slice(0, 3).map((s, idx) => (
+                        <span
+                          key={`ms-${item.analysisId}-${idx}`}
+                          className='px-2 py-1 text-xs rounded-full bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-200'>
+                          Missing: {s}
+                        </span>
+                      ))}
+                      {item.missingRequirements.slice(0, 2).map((r, idx) => (
+                        <span
+                          key={`mr-${item.analysisId}-${idx}`}
+                          className='px-2 py-1 text-xs rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-200'>
+                          Gap: {r}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  <div className='mt-3 flex justify-end'>
+                    <button
+                      onClick={() => openAnalysisFromHistory(item.analysisId)}
+                      disabled={historyOpeningId === item.analysisId}
+                      className='text-sm text-blue-600 hover:text-blue-700 dark:text-blue-300 dark:hover:text-blue-200 disabled:opacity-50 disabled:cursor-not-allowed'>
+                      {historyOpeningId === item.analysisId
+                        ? 'Opening...'
+                        : 'Open analysis'}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Footer */}
       <footer className='mt-16 pb-8 text-center text-sm text-gray-600 dark:text-gray-400'>

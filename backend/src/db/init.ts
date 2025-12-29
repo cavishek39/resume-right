@@ -20,6 +20,9 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     token TEXT NOT NULL UNIQUE,
+    provider TEXT NOT NULL DEFAULT 'oneclick',
+    email TEXT,
+    external_id TEXT,
     display_name TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
@@ -38,6 +41,8 @@ db.exec(`
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER,
     source_url TEXT,
+    job_title TEXT,
+    company TEXT,
     raw_text TEXT NOT NULL,
     extracted_skills TEXT,
     requirements TEXT,
@@ -52,6 +57,9 @@ db.exec(`
     job_id INTEGER NOT NULL,
     comparison_data TEXT NOT NULL,
     suggestions TEXT NOT NULL,
+    match_percentage REAL,
+    missing_skills_summary TEXT,
+    missing_requirements_summary TEXT,
     rewritten_resume TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id),
@@ -75,9 +83,33 @@ const ensureColumn = (
   }
 }
 
-ensureColumn('resumes', 'user_id', 'INTEGER REFERENCES users(id)')
-ensureColumn('job_descriptions', 'user_id', 'INTEGER REFERENCES users(id)')
-ensureColumn('analysis_results', 'user_id', 'INTEGER REFERENCES users(id)')
+ensureColumn('resumes', 'user_id', 'user_id INTEGER REFERENCES users(id)')
+ensureColumn(
+  'job_descriptions',
+  'user_id',
+  'user_id INTEGER REFERENCES users(id)'
+)
+ensureColumn('job_descriptions', 'job_title', 'job_title TEXT')
+ensureColumn('job_descriptions', 'company', 'company TEXT')
+ensureColumn(
+  'analysis_results',
+  'user_id',
+  'user_id INTEGER REFERENCES users(id)'
+)
+ensureColumn('analysis_results', 'match_percentage', 'match_percentage REAL')
+ensureColumn(
+  'analysis_results',
+  'missing_skills_summary',
+  'missing_skills_summary TEXT'
+)
+ensureColumn(
+  'analysis_results',
+  'missing_requirements_summary',
+  'missing_requirements_summary TEXT'
+)
+ensureColumn('users', 'provider', "provider TEXT NOT NULL DEFAULT 'oneclick'")
+ensureColumn('users', 'email', 'email TEXT')
+ensureColumn('users', 'external_id', 'external_id TEXT')
 
 console.log('✅ Database initialized')
 

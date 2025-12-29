@@ -2,7 +2,7 @@ import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { compareResumeToJob } from '../services/resumeComparer'
 import { rewriteResumeWithAI } from '../services/openRouterService'
 import db from '../db/init'
-import { getUserByToken } from '../services/authService'
+import { getUserByToken, verifyClerkToken } from '../services/authService'
 
 interface CompareBody {
   resumeId: number
@@ -13,10 +13,10 @@ interface RewriteBody {
   analysisId: number
 }
 
-const authenticate = (
+const authenticate = async (
   request: FastifyRequest,
   reply: FastifyReply
-): { id: number } | null => {
+): Promise<{ id: number } | null> => {
   const authHeader = request.headers.authorization
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -25,21 +25,22 @@ const authenticate = (
   }
 
   const token = authHeader.replace('Bearer ', '')
+
+  const clerkUser = await verifyClerkToken(token)
+  if (clerkUser) return { id: clerkUser.userId }
+
   const user = getUserByToken(token)
+  if (user) return { id: user.id }
 
-  if (!user) {
-    reply.code(401).send({ error: 'Invalid or expired token' })
-    return null
-  }
-
-  return { id: user.id }
+  reply.code(401).send({ error: 'Invalid or expired token' })
+  return null
 }
 
 async function analyzeRoutes(fastify: FastifyInstance): Promise<void> {
   // Compare resume against job and store analysis
   fastify.post<{ Body: CompareBody }>('/compare', async (request, reply) => {
     try {
-      const user = authenticate(request, reply)
+      const user = await authenticate(request, reply)
       if (!user) return
 
       const { resumeId, jobId } = request.body
@@ -90,8 +91,8 @@ async function analyzeRoutes(fastify: FastifyInstance): Promise<void> {
 
       // Store analysis result
       const insertStmt = db.prepare(`
-        INSERT INTO analysis_results (user_id, resume_id, job_id, comparison_data, suggestions)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO analysis_results (user_id, resume_id, job_id, comparison_data, suggestions, match_percentage, missing_skills_summary, missing_requirements_summary)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `)
 
       const result = insertStmt.run(
@@ -99,7 +100,10 @@ async function analyzeRoutes(fastify: FastifyInstance): Promise<void> {
         resumeId,
         jobId,
         JSON.stringify(comparison),
-        JSON.stringify(comparison.suggestions)
+        JSON.stringify(comparison.suggestions),
+        comparison.matchPercentage,
+        JSON.stringify(comparison.missingSkills.slice(0, 5)),
+        JSON.stringify(comparison.missingRequirements.slice(0, 5))
       )
 
       return {
@@ -116,7 +120,7 @@ async function analyzeRoutes(fastify: FastifyInstance): Promise<void> {
   // Rewrite resume using AI
   fastify.post<{ Body: RewriteBody }>('/rewrite', async (request, reply) => {
     try {
-      const user = authenticate(request, reply)
+      const user = await authenticate(request, reply)
       if (!user) return
 
       const { analysisId } = request.body
@@ -191,7 +195,7 @@ async function analyzeRoutes(fastify: FastifyInstance): Promise<void> {
   // Get analysis result by ID
   fastify.get<{ Params: { id: string } }>('/:id', async (request, reply) => {
     try {
-      const user = authenticate(request, reply)
+      const user = await authenticate(request, reply)
       if (!user) return
 
       const { id } = request.params
@@ -229,7 +233,7 @@ async function analyzeRoutes(fastify: FastifyInstance): Promise<void> {
     '/full',
     async (request, reply) => {
       try {
-        const user = authenticate(request, reply)
+        const user = await authenticate(request, reply)
         if (!user) return
 
         const { resumeId, jobId, rewrite = true } = request.body
@@ -295,8 +299,8 @@ async function analyzeRoutes(fastify: FastifyInstance): Promise<void> {
 
         // Store analysis result with rewritten resume
         const insertStmt = db.prepare(`
-        INSERT INTO analysis_results (user_id, resume_id, job_id, comparison_data, suggestions, rewritten_resume)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO analysis_results (user_id, resume_id, job_id, comparison_data, suggestions, rewritten_resume, match_percentage, missing_skills_summary, missing_requirements_summary)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `)
 
         const result = insertStmt.run(
@@ -305,7 +309,10 @@ async function analyzeRoutes(fastify: FastifyInstance): Promise<void> {
           jobId,
           JSON.stringify(comparison),
           JSON.stringify(comparison.suggestions),
-          rewrittenResume
+          rewrittenResume,
+          comparison.matchPercentage,
+          JSON.stringify(comparison.missingSkills.slice(0, 5)),
+          JSON.stringify(comparison.missingRequirements.slice(0, 5))
         )
 
         return {
@@ -320,6 +327,59 @@ async function analyzeRoutes(fastify: FastifyInstance): Promise<void> {
       }
     }
   )
+
+  // Recent analyses list for current user
+  fastify.get('/recent', async (request, reply) => {
+    try {
+      const user = await authenticate(request, reply)
+      if (!user) return
+
+      const stmt = db.prepare(`
+          SELECT ar.id, ar.job_id, ar.resume_id, ar.match_percentage, ar.missing_skills_summary, ar.missing_requirements_summary, ar.created_at,
+                 jd.job_title, jd.company, jd.source_url
+          FROM analysis_results ar
+          JOIN job_descriptions jd ON jd.id = ar.job_id
+          WHERE ar.user_id = ?
+          ORDER BY ar.created_at DESC
+          LIMIT 20
+        `)
+
+      const rows = stmt.all(user.id) as Array<{
+        id: number
+        job_id: number
+        resume_id: number
+        match_percentage: number | null
+        missing_skills_summary: string | null
+        missing_requirements_summary: string | null
+        created_at: string
+        job_title: string | null
+        company: string | null
+        source_url: string | null
+      }>
+
+      const items = rows.map((row) => ({
+        analysisId: row.id,
+        jobId: row.job_id,
+        resumeId: row.resume_id,
+        matchPercentage: row.match_percentage ?? null,
+        missingSkills: row.missing_skills_summary
+          ? (JSON.parse(row.missing_skills_summary) as string[])
+          : [],
+        missingRequirements: row.missing_requirements_summary
+          ? (JSON.parse(row.missing_requirements_summary) as string[])
+          : [],
+        jobTitle: row.job_title,
+        company: row.company,
+        sourceUrl: row.source_url,
+        createdAt: row.created_at,
+      }))
+
+      return { success: true, items }
+    } catch (error) {
+      fastify.log.error(error)
+      return reply.code(500).send({ error: (error as Error).message })
+    }
+  })
 }
 
 export default analyzeRoutes

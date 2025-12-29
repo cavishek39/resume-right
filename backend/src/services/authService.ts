@@ -94,17 +94,11 @@ export async function verifyClerkToken(
     return null
   }
 
-  console.log('🔐 Attempting Clerk token verification...')
-  console.log('Token preview:', token.substring(0, 20) + '...')
-
   try {
     // Clerk tokens need less strict verification options
     const verified = await verifyToken(token, {
       secretKey: clerkSecret,
     })
-
-    console.log('✅ Clerk token verified successfully')
-    console.log('Token claims:', JSON.stringify(verified, null, 2))
 
     const externalId = verified.sub
     const email = (verified as any).email as string | undefined
@@ -115,16 +109,12 @@ export async function verifyClerkToken(
       return null
     }
 
-    console.log('👤 Creating/fetching user for externalId:', externalId)
-
     const { userId } = getOrCreateExternalUser({
       provider: 'clerk',
       externalId,
       email: email || null,
       displayName: displayName || email || null,
     })
-
-    console.log('✅ User authenticated, userId:', userId)
     return { userId }
   } catch (error) {
     console.error('❌ Clerk token verification failed:')

@@ -111,6 +111,4 @@ ensureColumn('users', 'provider', "provider TEXT NOT NULL DEFAULT 'oneclick'")
 ensureColumn('users', 'email', 'email TEXT')
 ensureColumn('users', 'external_id', 'external_id TEXT')
 
-console.log('✅ Database initialized')
-
 export default db

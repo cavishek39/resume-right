@@ -11,32 +11,20 @@ const authenticate = async (
 ): Promise<{ id: number } | null> => {
   const authHeader = request.headers.authorization
 
-  console.log('🔍 Auth attempt - Header present:', !!authHeader)
-
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    console.log('❌ No Bearer token in Authorization header')
     reply.code(401).send({ error: 'Authorization token required' })
     return null
   }
 
   const token = authHeader.replace('Bearer ', '')
-  console.log('🎫 Token received (first 20 chars):', token.substring(0, 20) + '...')
-
-  console.log('Trying Clerk authentication...')
   const clerkUser = await verifyClerkToken(token)
   if (clerkUser) {
-    console.log('✅ Clerk auth successful, userId:', clerkUser.userId)
     return { id: clerkUser.userId }
   }
-
-  console.log('Trying legacy token authentication...')
   const user = getUserByToken(token)
   if (user) {
-    console.log('✅ Legacy auth successful, userId:', user.id)
     return { id: user.id }
   }
-
-  console.log('❌ Both auth methods failed')
   reply.code(401).send({ error: 'Invalid or expired token' })
   return null
 }

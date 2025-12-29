@@ -196,18 +196,6 @@ export async function scrapeJobDescription(url: string): Promise<string> {
         cleanedText.slice(0, 500)
       )
 
-    console.log(
-      '[jobScraper] extracted',
-      JSON.stringify({
-        url,
-        selectorUsed,
-        source,
-        length: cleanedText.length,
-        preview: cleanedText.slice(0, 160),
-        authWall: looksLikeAuthWall,
-      })
-    )
-
     if (!cleanedText || cleanedText.length < 50) {
       throw new Error(
         'Could not extract meaningful content. The site may require authentication or block scraping.'

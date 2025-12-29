@@ -50,7 +50,6 @@ export default function Home() {
   const loadToken = useCallback(async () => {
     // Request a fresh token to avoid stale/expired cache
     const token = await getToken({ skipCache: true })
-    // console.log('🎫 Token from Clerk:', token?.substring(0, 30) + '...')
     setAuthToken(token || null)
     return token
   }, [getToken])
@@ -96,7 +95,6 @@ export default function Home() {
     if (item.company) {
       return item.jobTitle ? `${item.company} • ${item.jobTitle}` : item.company
     }
-    if (item.jobTitle) return item.jobTitle
     if (item.sourceUrl) {
       try {
         const host = new URL(item.sourceUrl).hostname.replace(/^www\./, '')
@@ -105,7 +103,7 @@ export default function Home() {
         return 'Job'
       }
     }
-    return 'Job'
+    return 'Company Name'
   }, [])
 
   const openAnalysisFromHistory = useCallback(

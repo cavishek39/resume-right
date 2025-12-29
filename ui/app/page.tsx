@@ -349,7 +349,16 @@ export default function Home() {
 
       {/* Footer */}
       <footer className='mt-16 pb-8 text-center text-sm text-gray-600 dark:text-gray-400'>
-        <p>Resume Right • Powered by Google Gemini AI</p>
+        <p>
+          Develop with ❤️ by{' '}
+          <a
+            href='https://github.com/avishek87'
+            target='_blank'
+            rel='noreferrer'
+            className='font-bold text-blue-700 dark:text-blue-300 hover:underline'>
+            Avishek
+          </a>
+        </p>
       </footer>
     </div>
   )

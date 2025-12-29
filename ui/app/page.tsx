@@ -352,7 +352,7 @@ export default function Home() {
         <p>
           Develop with ❤️ by{' '}
           <a
-            href='https://github.com/avishek87'
+            href='https://github.com/cavishek39'
             target='_blank'
             rel='noreferrer'
             className='font-bold text-blue-700 dark:text-blue-300 hover:underline'>

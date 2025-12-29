@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { FileCheck, Sparkles, AlertCircle } from 'lucide-react'
 import FileUpload from '@/components/FileUpload'
 import JobInput from '@/components/JobInput'
@@ -11,15 +11,17 @@ import {
   submitJob,
   fullAnalysis,
   AnalysisResponse,
+  oneClickAuth,
 } from '@/lib/api'
 
 export default function Home() {
-  const [step, setStep] = useState<'upload' | 'job' | 'analyzing' | 'results'>(
-    'upload'
-  )
+  const [step, setStep] = useState<
+    'auth' | 'upload' | 'job' | 'analyzing' | 'results'
+  >('auth')
   const [resumeFile, setResumeFile] = useState<File | null>(null)
   const [resumeId, setResumeId] = useState<number | null>(null)
   const [jobId, setJobId] = useState<number | null>(null)
+  const [userId, setUserId] = useState<number | null>(null)
   const [lastJobData, setLastJobData] = useState<{
     jobUrl?: string
     jobText?: string
@@ -28,7 +30,55 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null)
   const [loadingMessage, setLoadingMessage] = useState('')
 
+  const progressSteps: Array<'auth' | 'upload' | 'job'> = [
+    'auth',
+    'upload',
+    'job',
+  ]
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const token = localStorage.getItem('authToken')
+    const storedUserId = localStorage.getItem('userId')
+
+    if (token && storedUserId) {
+      setUserId(Number(storedUserId))
+      setStep('upload')
+    }
+  }, [])
+
+  const handleOneClickAuth = async () => {
+    setError(null)
+    setLoadingMessage('Creating your session...')
+    setStep('analyzing')
+
+    try {
+      const response = await oneClickAuth()
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('authToken', response.token)
+        localStorage.setItem('userId', response.userId.toString())
+      }
+      setUserId(response.userId)
+      setStep('upload')
+    } catch (err: any) {
+      setError(
+        err.response?.data?.error ||
+          'Failed to create session. Please try again.'
+      )
+      setStep('auth')
+    } finally {
+      setLoadingMessage('')
+    }
+  }
+
   const handleResumeUpload = async (file: File) => {
+    if (!userId) {
+      setError('Please sign in before uploading a resume.')
+      setStep('auth')
+      return
+    }
+
     setResumeFile(file)
     setError(null)
     setLoadingMessage('Parsing your resume...')
@@ -51,6 +101,12 @@ export default function Home() {
     jobUrl?: string
     jobText?: string
   }) => {
+    if (!userId) {
+      setError('Please sign in before submitting a job description.')
+      setStep('auth')
+      return
+    }
+
     setLastJobData(data)
     setError(null)
     setLoadingMessage(
@@ -103,12 +159,22 @@ export default function Home() {
   }
 
   const handleReset = () => {
-    setStep('upload')
     setResumeFile(null)
     setResumeId(null)
     setJobId(null)
     setAnalysis(null)
     setError(null)
+    setStep(userId ? 'upload' : 'auth')
+  }
+
+  const currentProgressStep = () => {
+    if (step === 'results') return 'job'
+    if (step === 'analyzing') {
+      if (!userId) return 'auth'
+      if (resumeId) return 'job'
+      return 'upload'
+    }
+    return step
   }
 
   return (
@@ -157,6 +223,30 @@ export default function Home() {
                 </button>
               </div>
             </div>
+          </div>
+        )}
+
+        {step === 'auth' && (
+          <div className='bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8'>
+            <div className='flex items-center gap-3 mb-6'>
+              <div className='bg-indigo-100 dark:bg-indigo-900/30 p-3 rounded-lg'>
+                <Sparkles className='w-6 h-6 text-indigo-600 dark:text-indigo-400' />
+              </div>
+              <div>
+                <h2 className='text-xl font-semibold text-gray-900 dark:text-gray-100'>
+                  One-click Sign In
+                </h2>
+                <p className='text-sm text-gray-600 dark:text-gray-400'>
+                  Create a private session to store your uploads securely
+                </p>
+              </div>
+            </div>
+            <button
+              type='button'
+              onClick={handleOneClickAuth}
+              className='w-full inline-flex items-center justify-center rounded-lg bg-indigo-600 text-white px-4 py-3 text-sm font-medium hover:bg-indigo-700 transition-colors'>
+              Start with one click
+            </button>
           </div>
         )}
 
@@ -235,20 +325,24 @@ export default function Home() {
 
         {/* Progress Indicator */}
         {step !== 'results' && (
-          <div className='mt-8 flex items-center justify-center gap-2'>
-            <div
-              className={`w-3 h-3 rounded-full ${
-                step === 'upload' ? 'bg-blue-600' : 'bg-green-600'
-              }`}
-            />
-            <div className='w-12 h-1 bg-gray-300 dark:bg-gray-600' />
-            <div
-              className={`w-3 h-3 rounded-full ${
-                step === 'job' || step === 'analyzing'
-                  ? 'bg-blue-600'
-                  : 'bg-gray-300 dark:bg-gray-600'
-              }`}
-            />
+          <div className='mt-8 flex items-center justify-center gap-3'>
+            {progressSteps.map((progressStep, index) => {
+              const activeIndex = progressSteps.indexOf(currentProgressStep())
+              const isActive = activeIndex >= index
+
+              return (
+                <div key={progressStep} className='flex items-center gap-3'>
+                  <div
+                    className={`w-3 h-3 rounded-full ${
+                      isActive ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'
+                    }`}
+                  />
+                  {index < progressSteps.length - 1 && (
+                    <div className='w-12 h-1 bg-gray-300 dark:bg-gray-600' />
+                  )}
+                </div>
+              )
+            })}
           </div>
         )}
       </main>

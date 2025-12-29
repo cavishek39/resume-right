@@ -1,17 +1,43 @@
-import { FastifyInstance } from 'fastify'
+import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { scrapeJobDescription } from '../services/jobScraper'
 import { extractSkillsAndRequirements } from '../services/skillExtractor'
 import db from '../db/init'
+import { getUserByToken } from '../services/authService'
 
 interface JobSubmitBody {
   jobUrl?: string
   jobText?: string
 }
 
+const authenticate = (
+  request: FastifyRequest,
+  reply: FastifyReply
+): { id: number } | null => {
+  const authHeader = request.headers.authorization
+
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    reply.code(401).send({ error: 'Authorization token required' })
+    return null
+  }
+
+  const token = authHeader.replace('Bearer ', '')
+  const user = getUserByToken(token)
+
+  if (!user) {
+    reply.code(401).send({ error: 'Invalid or expired token' })
+    return null
+  }
+
+  return { id: user.id }
+}
+
 async function jobRoutes(fastify: FastifyInstance): Promise<void> {
   // Submit job description (text or URL)
   fastify.post<{ Body: JobSubmitBody }>('/submit', async (request, reply) => {
     try {
+      const user = authenticate(request, reply)
+      if (!user) return
+
       const { jobUrl, jobText } = request.body
 
       if (!jobUrl && !jobText) {
@@ -49,11 +75,12 @@ async function jobRoutes(fastify: FastifyInstance): Promise<void> {
 
       // Store in database
       const stmt = db.prepare(`
-        INSERT INTO job_descriptions (source_url, raw_text, extracted_skills, requirements)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO job_descriptions (user_id, source_url, raw_text, extracted_skills, requirements)
+        VALUES (?, ?, ?, ?, ?)
       `)
 
       const result = stmt.run(
+        user.id,
         sourceUrl,
         rawText,
         JSON.stringify(extracted.skills),
@@ -74,6 +101,9 @@ async function jobRoutes(fastify: FastifyInstance): Promise<void> {
   // Get job description by ID
   fastify.get<{ Params: { id: string } }>('/:id', async (request, reply) => {
     try {
+      const user = authenticate(request, reply)
+      if (!user) return
+
       const { id } = request.params
 
       const stmt = db.prepare('SELECT * FROM job_descriptions WHERE id = ?')
@@ -81,6 +111,10 @@ async function jobRoutes(fastify: FastifyInstance): Promise<void> {
 
       if (!job) {
         return reply.code(404).send({ error: 'Job description not found' })
+      }
+
+      if (job.user_id !== user.id) {
+        return reply.code(403).send({ error: 'Not authorized to access' })
       }
 
       return {

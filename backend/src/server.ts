@@ -8,6 +8,7 @@ import dotenv from 'dotenv'
 import resumeRoutes from './routes/resume'
 import jobRoutes from './routes/job'
 import analyzeRoutes from './routes/analyze'
+import authRoutes from './routes/auth'
 
 dotenv.config()
 
@@ -34,6 +35,7 @@ app.get('/health', async (request, reply) => {
 app.register(resumeRoutes, { prefix: '/api/resume' })
 app.register(jobRoutes, { prefix: '/api/job' })
 app.register(analyzeRoutes, { prefix: '/api/analyze' })
+app.register(authRoutes, { prefix: '/api/auth' })
 
 // Ensure required directories exist
 const ensureDirectories = () => {

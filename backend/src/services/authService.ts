@@ -118,7 +118,7 @@ export async function verifyClerkToken(
     return { userId }
   } catch (error) {
     console.error('❌ Clerk token verification failed:')
-    console.error('Error type:', error.constructor.name)
+    console.error('Error type:', error)
     console.error('Error message:', (error as Error).message)
     console.error('Full error:', error)
     return null

@@ -84,12 +84,13 @@ export default function Home() {
   }, [isLoaded, isSignedIn, loadToken, refreshRecent, router])
 
   const requireAuthToken = useCallback(async () => {
-    const token = authToken || (await loadToken())
+    // Always fetch a fresh token to avoid using an expired cached value
+    const token = await loadToken()
     if (!token) {
       throw new Error('Missing auth token. Please sign in again.')
     }
     return token
-  }, [authToken, loadToken])
+  }, [loadToken])
 
   const formatJobLabel = useCallback((item: RecentAnalysisItem) => {
     if (item.company) {

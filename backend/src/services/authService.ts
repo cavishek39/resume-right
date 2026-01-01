@@ -98,6 +98,7 @@ export async function verifyClerkToken(
     // Clerk tokens need less strict verification options
     const verified = await verifyToken(token, {
       secretKey: clerkSecret,
+      clockSkewInMs: 60 * 1000, // tolerate small clock drift to avoid false expirations
     })
 
     const externalId = verified.sub

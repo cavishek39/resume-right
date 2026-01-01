@@ -76,7 +76,8 @@ export interface RecentAnalysesResponse {
 
 export async function uploadResume(
   file: File,
-  token: string
+  token: string,
+  signal?: AbortSignal
 ): Promise<ResumeUploadResponse> {
   const formData = new FormData()
   formData.append('file', file)
@@ -86,6 +87,7 @@ export async function uploadResume(
       'Content-Type': 'multipart/form-data',
       Authorization: `Bearer ${token}`,
     },
+    signal,
   })
 
   return response.data
@@ -97,12 +99,14 @@ export async function submitJob(
     jobText?: string
     companyName?: string
   },
-  token: string
+  token: string,
+  signal?: AbortSignal
 ): Promise<JobSubmitResponse> {
   const response = await api.post('/api/job/submit', data, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
+    signal,
   })
   return response.data
 }
@@ -113,12 +117,14 @@ export async function fullAnalysis(
     jobId: number
     rewrite?: boolean
   },
-  token: string
+  token: string,
+  signal?: AbortSignal
 ): Promise<AnalysisResponse> {
   const response = await api.post('/api/analyze/full', data, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
+    signal,
   })
   return response.data
 }

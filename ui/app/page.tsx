@@ -44,6 +44,11 @@ export default function Home() {
   const [recentError, setRecentError] = useState<string | null>(null)
   const [recentItems, setRecentItems] = useState<RecentAnalysisItem[]>([])
   const [historyOpeningId, setHistoryOpeningId] = useState<number | null>(null)
+  const [analyzingContext, setAnalyzingContext] = useState<
+    'upload' | 'job' | null
+  >(null)
+  const [abortController, setAbortController] =
+    useState<AbortController | null>(null)
 
   const progressSteps: Array<'upload' | 'job'> = ['upload', 'job']
 
@@ -147,15 +152,23 @@ export default function Home() {
     setResumeFile(file)
     setError(null)
     setLoadingMessage('Parsing your resume...')
+    setAnalyzingContext('upload')
     setStep('analyzing')
+
+    const controller = new AbortController()
+    setAbortController(controller)
 
     try {
       const token = await requireAuthToken()
-      const response = await uploadResume(file, token)
+      const response = await uploadResume(file, token, controller.signal)
       setResumeId(response.resumeId)
       setStep('job')
       void refreshRecent(token)
     } catch (err: any) {
+      if (err?.name === 'CanceledError' || err?.code === 'ERR_CANCELED') {
+        // Cancelled by user; state already reset
+        return
+      }
       setError(
         err.response?.data?.error ||
           err.message ||
@@ -164,6 +177,8 @@ export default function Home() {
       setStep('upload')
     } finally {
       setLoadingMessage('')
+      setAnalyzingContext(null)
+      setAbortController(null)
     }
   }
 
@@ -185,11 +200,15 @@ export default function Home() {
         ? 'Scraping job description...'
         : 'Processing job description...'
     )
+    setAnalyzingContext('job')
     setStep('analyzing')
+
+    const controller = new AbortController()
+    setAbortController(controller)
 
     try {
       const token = await requireAuthToken()
-      const jobResponse = await submitJob(data, token)
+      const jobResponse = await submitJob(data, token, controller.signal)
       setJobId(jobResponse.jobId)
 
       setLoadingMessage(
@@ -201,12 +220,17 @@ export default function Home() {
           jobId: jobResponse.jobId,
           rewrite: true,
         },
-        token
+        token,
+        controller.signal
       )
       setAnalysis(analysisResponse)
       setStep('results')
       void refreshRecent(token)
     } catch (err: any) {
+      if (err?.name === 'CanceledError' || err?.code === 'ERR_CANCELED') {
+        // Cancelled by user; state already reset
+        return
+      }
       setError(
         err.response?.data?.error ||
           err.message ||
@@ -215,6 +239,8 @@ export default function Home() {
       setStep('job')
     } finally {
       setLoadingMessage('')
+      setAnalyzingContext(null)
+      setAbortController(null)
     }
   }
 
@@ -233,12 +259,36 @@ export default function Home() {
   }
 
   const handleReset = () => {
+    abortController?.abort()
     setResumeFile(null)
     setResumeId(null)
     setJobId(null)
     setAnalysis(null)
     setError(null)
     setStep('upload')
+    setAnalyzingContext(null)
+    setAbortController(null)
+    void loadToken()
+  }
+
+  const handleCancelAnalyzing = () => {
+    abortController?.abort()
+    setLoadingMessage('')
+    setAnalysis(null)
+    setError(null)
+
+    if (analyzingContext === 'job') {
+      setJobId(null)
+      setStep('job')
+    } else {
+      setResumeFile(null)
+      setResumeId(null)
+      setJobId(null)
+      setStep('upload')
+    }
+
+    setAnalyzingContext(null)
+    setAbortController(null)
   }
 
   const currentProgressStep = useMemo<'upload' | 'job'>(() => {
@@ -370,6 +420,14 @@ export default function Home() {
         {step === 'analyzing' && (
           <div className='bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8'>
             <LoadingSpinner message={loadingMessage} />
+            <div className='mt-6 flex justify-center'>
+              <button
+                type='button'
+                onClick={handleCancelAnalyzing}
+                className='inline-flex items-center rounded-md border border-gray-300 dark:border-gray-700 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors'>
+                Cancel
+              </button>
+            </div>
           </div>
         )}
 

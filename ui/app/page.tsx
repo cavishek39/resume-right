@@ -214,18 +214,22 @@ export default function Home() {
       setLoadingMessage(
         'Analyzing resume match and generating AI suggestions...'
       )
+
+      // Refresh token to prevent expiry during long job scraping
+      const analysisToken = await requireAuthToken()
+
       const analysisResponse = await fullAnalysis(
         {
           resumeId,
           jobId: jobResponse.jobId,
           rewrite: true,
         },
-        token,
+        analysisToken,
         controller.signal
       )
       setAnalysis(analysisResponse)
       setStep('results')
-      void refreshRecent(token)
+      void refreshRecent(analysisToken)
     } catch (err: any) {
       if (err?.name === 'CanceledError' || err?.code === 'ERR_CANCELED') {
         // Cancelled by user; state already reset
@@ -306,44 +310,62 @@ export default function Home() {
   return (
     <div className='min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800'>
       {/* Header */}
-      <header className='bg-white dark:bg-gray-800 shadow-sm'>
-        <div className='max-w-6xl mx-auto px-4 py-6 flex items-center justify-between gap-4'>
-          <div className='flex items-center gap-3'>
-            <Sparkles className='w-8 h-8 text-blue-600' />
+      <header className='sticky top-0 z-30 w-full bg-white/70 dark:bg-gray-900/70 backdrop-blur-xl border-b border-gray-200/50 dark:border-gray-800/50'>
+        <div className='max-w-6xl mx-auto px-4 h-20 flex items-center justify-between gap-4'>
+          <div
+            className='flex items-center gap-4 group cursor-pointer'
+            onClick={() => setStep('upload')}>
+            <div className='bg-gradient-to-br from-blue-600 to-indigo-600 p-2.5 rounded-xl shadow-lg shadow-blue-500/20 transform group-hover:scale-105 transition-transform duration-300'>
+              <img src='/resume-right.svg' alt='Logo' className='w-7 h-7' />
+            </div>
             <div>
-              <h1 className='text-2xl font-bold text-gray-900 dark:text-gray-100'>
+              <h1 className='text-xl font-extrabold tracking-tight text-gray-900 dark:text-white'>
                 Resume Right
               </h1>
-              <p className='text-sm text-gray-600 dark:text-gray-400'>
-                AI-powered resume optimization for better job matches
+              <p className='text-[10px] uppercase tracking-[0.2em] font-bold text-gray-500 dark:text-gray-400'>
+                AI Selection Suite
               </p>
             </div>
           </div>
 
           {isSignedIn && (
-            <div className='flex items-center gap-3 bg-gray-50 dark:bg-gray-700 px-3 py-2 rounded-lg'>
-              <div className='text-sm text-gray-700 dark:text-gray-200'>
-                <p className='font-semibold'>{displayName}</p>
-                <p className='text-xs text-gray-500 dark:text-gray-400'>
-                  Signed in
-                </p>
+            <div className='flex items-center gap-2 bg-white/50 dark:bg-gray-800/50 p-1.5 rounded-[1.25rem] border border-gray-200/50 dark:border-gray-700/50 shadow-sm'>
+              <div className='flex items-center gap-3 pl-3 pr-2'>
+                {user?.imageUrl && (
+                  <img
+                    src={user.imageUrl}
+                    className='w-8 h-8 rounded-full border border-white/20'
+                    alt={displayName}
+                  />
+                )}
+                <div className='hidden sm:block'>
+                  <p className='text-xs font-bold text-gray-900 dark:text-gray-100 truncate max-w-[120px]'>
+                    {displayName}
+                  </p>
+                  <p className='text-[9px] uppercase tracking-wider font-bold text-blue-600 dark:text-blue-400'>
+                    Free Tier
+                  </p>
+                </div>
               </div>
-              <button
-                onClick={() => setRecentOpen(true)}
-                className='inline-flex items-center gap-1 text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-300 dark:hover:text-blue-200'>
-                History
-              </button>
-              <button
-                onClick={() =>
-                  signOut(() => {
-                    setAuthToken(null)
-                    router.push('/auth')
-                  })
-                }
-                className='inline-flex items-center gap-1 text-sm font-medium text-red-600 hover:text-red-700 dark:text-red-300 dark:hover:text-red-200'>
-                <LogOut className='w-4 h-4' />
-                Sign out
-              </button>
+
+              <div className='flex items-center gap-1.5 ml-2'>
+                <button
+                  onClick={() => setRecentOpen(true)}
+                  className='h-8 px-4 inline-flex items-center text-[11px] font-bold uppercase tracking-wider bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 border border-gray-200/50 dark:border-gray-600/50 rounded-full hover:bg-gray-50 dark:hover:bg-gray-600 transition-all duration-300'>
+                  History
+                </button>
+                <button
+                  onClick={() =>
+                    signOut(() => {
+                      setAuthToken(null)
+                      router.push('/auth')
+                    })
+                  }
+                  className='h-8 w-8 flex items-center justify-center rounded-full bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border border-red-100 dark:border-red-900/30 hover:bg-red-100 dark:hover:bg-red-900/40 transition-all duration-300'
+                  title='Sign out'>
+                  <LogOut className='w-4 h-4' />
+                </button>
+              </div>
             </div>
           )}
         </div>

@@ -140,38 +140,38 @@ export default function AuthPage() {
   }
 
   return (
-    <div className='min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-900 text-white flex items-center justify-center px-4 py-12'>
-      <div className='max-w-xl w-full'>
-        <div className='bg-white/5 border border-white/10 rounded-2xl p-8 shadow-2xl backdrop-blur'>
-          <div className='flex items-center gap-3 mb-6'>
-            <div className='bg-indigo-500/20 border border-indigo-400/40 rounded-xl p-3'>
-              <Sparkles className='w-7 h-7 text-indigo-200' />
+    <div className='min-h-screen bg-[#0f172a] relative overflow-hidden flex items-center justify-center px-4 py-12'>
+      {/* Dynamic Background Decorations */}
+      <div className='absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-indigo-500/10 rounded-full blur-[120px] animate-pulse' />
+      <div className='absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-500/10 rounded-full blur-[120px] animate-pulse [animation-delay:2s]' />
+
+      <div className='max-w-xl w-full relative z-10'>
+        <div className='bg-white/[0.03] border border-white/10 rounded-[2rem] p-8 md:p-10 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.5)] backdrop-blur-xl transition-all duration-500 hover:border-white/20 group'>
+          {/* Top Shine Effect */}
+          <div className='absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent' />
+
+          <div className='flex items-center gap-5 mb-8'>
+            <div className='bg-gradient-to-br from-indigo-500/20 to-blue-500/10 border border-white/10 rounded-2xl p-4 shadow-inner transform transition-transform group-hover:scale-110 duration-500'>
+              <img src='/resume-right.svg' alt='Logo' className='w-8 h-8' />
             </div>
             <div>
-              <p className='text-sm uppercase tracking-wide text-indigo-200'>
-                Secure Access
-              </p>
-              <h1 className='text-2xl font-semibold text-white'>
-                Sign in to Resume Right
+              <h1 className='text-3xl font-bold tracking-tight text-white'>
+                Resume Right
               </h1>
-              <p className='text-sm text-indigo-100/80 mt-1'>
-                Continue with Google or email. Custom UI, Clerk-secured, no
-                surprises.
-              </p>
             </div>
           </div>
 
-          <div className='flex gap-2 mb-6'>
+          <div className='grid grid-cols-2 gap-3 mb-8 bg-white/[0.02] p-1.5 rounded-2xl border border-white/5'>
             <button
               onClick={() => {
                 setMode('signin')
                 setError(null)
                 setPendingVerification(false)
               }}
-              className={`flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold transition-colors ${
+              className={`flex items-center justify-center gap-2.5 px-4 py-3 rounded-xl text-sm font-bold transition-all duration-300 ${
                 mode === 'signin'
-                  ? 'bg-white text-slate-900'
-                  : 'bg-white/10 text-white'
+                  ? 'bg-white text-slate-900 shadow-[0_4px_12px_rgba(255,255,255,0.2)]'
+                  : 'text-white/60 hover:text-white hover:bg-white/5'
               }`}>
               <LogIn className='w-4 h-4' />
               Sign in
@@ -182,13 +182,13 @@ export default function AuthPage() {
                 setError(null)
                 setPendingVerification(false)
               }}
-              className={`flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold transition-colors ${
+              className={`flex items-center justify-center gap-2.5 px-4 py-3 rounded-xl text-sm font-bold transition-all duration-300 ${
                 mode === 'signup'
-                  ? 'bg-white text-slate-900'
-                  : 'bg-white/10 text-white'
+                  ? 'bg-white text-slate-900 shadow-[0_4px_12px_rgba(255,255,255,0.2)]'
+                  : 'text-white/60 hover:text-white hover:bg-white/5'
               }`}>
               <UserPlus className='w-4 h-4' />
-              Create account
+              Sign up
             </button>
           </div>
 
@@ -196,55 +196,59 @@ export default function AuthPage() {
             type='button'
             disabled={!ready || loading}
             onClick={handleGoogle}
-            className='w-full inline-flex items-center justify-center gap-3 bg-white text-slate-900 font-semibold py-3 rounded-xl shadow hover:shadow-md transition disabled:opacity-60'>
+            className='w-full inline-flex items-center justify-center gap-3 bg-white text-slate-900 font-bold py-3.5 rounded-xl shadow-lg hover:shadow-white/10 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 disabled:opacity-60'>
             {loading ? (
-              <Loader2 className='w-4 h-4 animate-spin' />
+              <Loader2 className='w-5 h-5 animate-spin' />
             ) : (
-              <Sparkles className='w-4 h-4' />
+              <Sparkles className='w-5 h-5 text-indigo-600' />
             )}
             Continue with Google
           </button>
 
-          <div className='relative my-6'>
-            <div className='border-t border-white/10' />
-            <p className='absolute -top-3 left-1/2 -translate-x-1/2 px-3 text-xs uppercase tracking-[0.2em] text-white/60 bg-slate-900'>
-              or email
-            </p>
+          <div className='relative my-10'>
+            <div className='absolute inset-0 flex items-center'>
+              <div className='w-full border-t border-white/10' />
+            </div>
+            <div className='relative flex justify-center text-xs uppercase tracking-[0.2em] font-bold'>
+              <span className='px-4 text-white/40 bg-[#161d31] rounded-full py-1 border border-white/5'>
+                OR EMAIL
+              </span>
+            </div>
           </div>
 
           {!pendingVerification && (
             <form
               onSubmit={mode === 'signin' ? handleSignIn : startSignUp}
-              className='space-y-4'>
-              <div className='space-y-2'>
-                <label className='text-sm text-white/80 flex items-center gap-2'>
-                  <Mail className='w-4 h-4' /> Email
+              className='space-y-5'>
+              <div className='space-y-2.5'>
+                <label className='text-xs font-bold text-indigo-200/60 uppercase tracking-widest flex items-center gap-2 ml-1'>
+                  <Mail className='w-3.5 h-3.5' /> Email Address
                 </label>
                 <input
                   type='email'
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  className='w-full rounded-xl bg-white/5 border border-white/10 px-4 py-3 text-white placeholder:text-white/50 focus:outline-none focus:ring-2 focus:ring-indigo-400'
+                  className='w-full rounded-xl bg-white/[0.03] border border-white/10 px-4 py-3.5 text-white placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all duration-300'
                   placeholder='you@example.com'
                 />
               </div>
 
-              <div className='space-y-2'>
-                <label className='text-sm text-white/80 flex items-center gap-2'>
-                  <Lock className='w-4 h-4' /> Password
+              <div className='space-y-2.5'>
+                <label className='text-xs font-bold text-indigo-200/60 uppercase tracking-widest flex items-center gap-2 ml-1'>
+                  <Lock className='w-3.5 h-3.5' /> Password
                 </label>
                 <input
                   type='password'
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  className='w-full rounded-xl bg-white/5 border border-white/10 px-4 py-3 text-white placeholder:text-white/50 focus:outline-none focus:ring-2 focus:ring-indigo-400'
+                  className='w-full rounded-xl bg-white/[0.03] border border-white/10 px-4 py-3.5 text-white placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all duration-300'
                   placeholder='••••••••'
                 />
                 {mode === 'signup' && (
-                  <p className='text-xs text-white/60 flex items-center gap-2'>
-                    <ShieldCheck className='w-4 h-4' /> Min 8 chars, with
+                  <p className='text-xs text-indigo-200/40 flex items-center gap-2 ml-1'>
+                    <ShieldCheck className='w-3.5 h-3.5' /> Min 8 chars, with
                     numbers & letters
                   </p>
                 )}
@@ -253,11 +257,11 @@ export default function AuthPage() {
               <button
                 type='submit'
                 disabled={!ready || loading}
-                className='w-full inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-3 transition disabled:opacity-60'>
+                className='w-full inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white font-bold py-3.5 transition-all duration-300 shadow-lg shadow-indigo-500/20 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-60'>
                 {loading ? (
-                  <Loader2 className='w-4 h-4 animate-spin' />
+                  <Loader2 className='w-5 h-5 animate-spin' />
                 ) : (
-                  <ArrowRight className='w-4 h-4' />
+                  <ArrowRight className='w-5 h-5' />
                 )}
                 {mode === 'signin' ? 'Sign in' : 'Create account'}
               </button>

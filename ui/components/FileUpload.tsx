@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Upload, FileText } from 'lucide-react'
+import { Upload, FileText, CloudUpload } from 'lucide-react'
 
 interface FileUploadProps {
   onFileSelect: (file: File) => void
@@ -49,14 +49,14 @@ export default function FileUpload({
 
   return (
     <div className='w-full'>
-      <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2'>
+      <label className='block text-[10px] font-semibold uppercase tracking-wider text-blue-400 mb-3'>
         {label}
       </label>
       <div
-        className={`relative border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
+        className={`relative border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all duration-300 group ${
           dragActive
-            ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-            : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
+            ? 'border-blue-500 bg-blue-500/10'
+            : 'border-white/10 hover:border-white/20 hover:bg-white/[0.02]'
         }`}
         onDragEnter={handleDrag}
         onDragLeave={handleDrag}
@@ -66,31 +66,47 @@ export default function FileUpload({
           type='file'
           accept={accept}
           onChange={handleChange}
-          className='absolute inset-0 w-full h-full opacity-0 cursor-pointer'
+          className='absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20'
         />
-        <div className='flex flex-col items-center'>
+        <div className='flex flex-col items-center relative z-10'>
           {selectedFile ? (
-            <>
-              <FileText className='w-12 h-12 text-green-500 mb-3' />
-              <p className='text-sm font-medium text-gray-900 dark:text-gray-100'>
+            <div className='animate-in fade-in zoom-in duration-200'>
+              <div className='bg-green-500/10 border border-green-500/20 p-3 rounded-full mb-3 mx-auto w-fit'>
+                <FileText className='w-8 h-8 text-green-400' />
+              </div>
+              <p className='text-sm font-semibold text-white mb-0.5'>
                 {selectedFile.name}
               </p>
-              <p className='text-xs text-gray-500 dark:text-gray-400 mt-1'>
-                {(selectedFile.size / 1024).toFixed(2)} KB
+              <p className='text-xs text-slate-400 font-medium'>
+                {(selectedFile.size / 1024).toFixed(2)} KB • Ready to Analyze
               </p>
-            </>
+            </div>
           ) : (
             <>
-              <Upload className='w-12 h-12 text-gray-400 mb-3' />
-              <p className='text-sm text-gray-600 dark:text-gray-300'>
-                Drag and drop your resume here, or click to browse
+              <div className='bg-white/5 border border-white/10 p-4 rounded-full mb-4 group-hover:scale-105 group-hover:bg-white/10 transition-all duration-300'>
+                <CloudUpload className='w-8 h-8 text-white/50 group-hover:text-white transition-colors' />
+              </div>
+              <p className='text-base font-semibold text-white mb-1'>
+                Drop your resume here
               </p>
-              <p className='text-xs text-gray-500 dark:text-gray-400 mt-2'>
-                PDF or DOCX (Max 10MB)
+              <p className='text-sm text-slate-400 max-w-xs mx-auto mb-4'>
+                We accept PDF or DOCX files for the best results
+              </p>
+              <div className='inline-flex items-center px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-xs font-semibold text-white uppercase tracking-wide group-hover:bg-blue-600 group-hover:border-transparent transition-all duration-200'>
+                Browse Files
+              </div>
+              <p className='text-[9px] text-slate-500 mt-4 font-medium uppercase tracking-wider'>
+                Maximum File Size: 5MB
               </p>
             </>
           )}
         </div>
+
+        {/* Decorative corner accents */}
+        <div className='absolute top-3 left-3 w-3 h-3 border-t border-l border-white/5 rounded-tl-sm' />
+        <div className='absolute top-3 right-3 w-3 h-3 border-t border-r border-white/5 rounded-tr-sm' />
+        <div className='absolute bottom-3 left-3 w-3 h-3 border-b border-l border-white/5 rounded-bl-sm' />
+        <div className='absolute bottom-3 right-3 w-3 h-3 border-b border-r border-white/5 rounded-br-sm' />
       </div>
     </div>
   )

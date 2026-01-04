@@ -13,17 +13,19 @@ import healthRoutes from './routes/health'
 
 dotenv.config()
 
+const MAX_FILE_SIZE = parseInt(process.env.MAX_FILE_SIZE || '5242880') // 5MB default
+
 // Initialize Fastify
 const app = fastify({
   logger: true,
-  bodyLimit: parseInt(process.env.MAX_FILE_SIZE || '10485760'), // 10MB default
+  bodyLimit: MAX_FILE_SIZE,
 })
 
 // Register plugins
 app.register(cors, { origin: true })
 app.register(multipart, {
   limits: {
-    fileSize: parseInt(process.env.MAX_FILE_SIZE || '10485760'),
+    fileSize: MAX_FILE_SIZE,
   },
 })
 

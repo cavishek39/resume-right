@@ -4,7 +4,7 @@ import React from 'react'
 
 const Footer: React.FC = () => {
   return (
-    <footer className='mt-auto py-8 text-center text-sm text-gray-500 dark:text-gray-400 border-t border-gray-100 dark:border-gray-800/50 bg-white/30 dark:bg-gray-900/30 backdrop-blur-sm'>
+    <footer className='mt-auto py-6 text-center text-sm text-slate-400 border-t border-white/10 bg-slate-900/50 backdrop-blur-sm'>
       <div className='max-w-6xl mx-auto px-4'>
         <p className='flex items-center justify-center gap-1.5'>
           Developed with <span className='text-red-500 animate-pulse'>❤️</span>{' '}
@@ -13,7 +13,7 @@ const Footer: React.FC = () => {
             href='https://github.com/cavishek39'
             target='_blank'
             rel='noreferrer'
-            className='font-bold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:underline transition-all duration-300'>
+            className='font-bold text-indigo-400 hover:text-indigo-300 hover:underline transition-all duration-300'>
             Avishek
           </a>
         </p>

@@ -19,7 +19,10 @@
     "start:ui": "npm run start --workspace=ui",
     "lint": "npm run lint --workspace=ui",
     "install:all": "npm install && npm install --workspaces",
-    "clean": "rm -rf backend/dist backend/node_modules ui/.next ui/node_modules node_modules"
+    "clean": "rm -rf backend/dist backend/node_modules ui/.next ui/node_modules node_modules",
+    "deploy": "concurrently \"npm run deploy:ui\" \"npm run deploy:backend\"",
+    "deploy:ui": "vercel --prod --cwd ui",
+    "deploy:backend": "render deploys create"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

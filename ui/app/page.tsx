@@ -29,7 +29,6 @@ export default function Home() {
   )
   const [resumeFile, setResumeFile] = useState<File | null>(null)
   const [resumeId, setResumeId] = useState<number | null>(null)
-  const [jobId, setJobId] = useState<number | null>(null)
   const [lastJobData, setLastJobData] = useState<{
     jobUrl?: string
     jobText?: string
@@ -77,7 +76,7 @@ export default function Home() {
   useEffect(() => {
     if (!isLoaded) return
     if (!isSignedIn) {
-      router.push('/auth')
+      router.push('/login')
       return
     }
     void (async () => {
@@ -126,7 +125,6 @@ export default function Home() {
           rewrittenResume: detail.rewrittenResume,
         })
         setResumeId(detail.resumeId)
-        setJobId(detail.jobId)
         setError(null)
         setStep('results')
         setRecentOpen(false)
@@ -145,7 +143,7 @@ export default function Home() {
 
   const handleResumeUpload = async (file: File) => {
     if (!isSignedIn) {
-      router.push('/auth')
+      router.push('/login')
       return
     }
 
@@ -189,7 +187,7 @@ export default function Home() {
   }) => {
     if (!isSignedIn || !resumeId) {
       setError('Please sign in and upload a resume first.')
-      router.push('/auth')
+      router.push('/login')
       return
     }
 
@@ -209,7 +207,6 @@ export default function Home() {
     try {
       const token = await requireAuthToken()
       const jobResponse = await submitJob(data, token, controller.signal)
-      setJobId(jobResponse.jobId)
 
       setLoadingMessage(
         'Analyzing resume match and generating AI suggestions...'
@@ -266,7 +263,6 @@ export default function Home() {
     abortController?.abort()
     setResumeFile(null)
     setResumeId(null)
-    setJobId(null)
     setAnalysis(null)
     setError(null)
     setStep('upload')
@@ -282,12 +278,11 @@ export default function Home() {
     setError(null)
 
     if (analyzingContext === 'job') {
-      setJobId(null)
       setStep('job')
     } else {
       setResumeFile(null)
       setResumeId(null)
-      setJobId(null)
+
       setStep('upload')
     }
 
@@ -358,7 +353,7 @@ export default function Home() {
                   onClick={() =>
                     signOut(() => {
                       setAuthToken(null)
-                      router.push('/auth')
+                      router.push('/login')
                     })
                   }
                   className='h-8 w-8 flex items-center justify-center rounded-full bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border border-red-100 dark:border-red-900/30 hover:bg-red-100 dark:hover:bg-red-900/40 transition-all duration-300'
@@ -616,20 +611,6 @@ export default function Home() {
           </div>
         </div>
       )}
-
-      {/* Footer */}
-      <footer className='mt-16 pb-8 text-center text-sm text-gray-600 dark:text-gray-400'>
-        <p>
-          Develop with ❤️ by{' '}
-          <a
-            href='https://github.com/cavishek39'
-            target='_blank'
-            rel='noreferrer'
-            className='font-bold text-blue-700 dark:text-blue-300 hover:underline'>
-            Avishek
-          </a>
-        </p>
-      </footer>
     </div>
   )
 }

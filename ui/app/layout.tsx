@@ -13,6 +13,8 @@ const geistMono = Geist_Mono({
   subsets: ['latin'],
 })
 
+import Footer from '@/components/Footer'
+
 export const metadata: Metadata = {
   title: 'Resume Right',
   description: 'AI-powered resume tailoring and job match analysis',
@@ -30,8 +32,9 @@ export default function RootLayout({
     <ClerkProvider>
       <html lang='en' suppressHydrationWarning>
         <body
-          className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-          {children}
+          className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col`}>
+          <main className='flex-grow'>{children}</main>
+          <Footer />
         </body>
       </html>
     </ClerkProvider>
